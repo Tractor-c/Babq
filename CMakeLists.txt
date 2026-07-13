@@ -50,6 +50,14 @@ elseif(MSVC)
     target_compile_options(babq PRIVATE /W4)
 endif()
 
+# ThreadSanitizer support
+option(ENABLE_TSAN "Enable ThreadSanitizer for data-race detection" OFF)
+
+if(ENABLE_TSAN)
+    target_compile_options(babq PRIVATE -fsanitize=thread)
+    target_link_options(babq PRIVATE -fsanitize=thread)
+endif()
+
 target_link_libraries(babq
     PRIVATE
         Threads::Threads
