@@ -62,7 +62,7 @@ namespace babq
         std::memcpy(copied_batch.entries, m.entries, snapshot_index * sizeof(RSetEntry));
         copied_batch.count = snapshot_index;
 
-        // 3. Sumbit the copy to Ring; same in the flush_full
+        // 3. Sumbit the copy to Ring; same in the enq_global()
         int spin_count = 0;
         while (true)
         {

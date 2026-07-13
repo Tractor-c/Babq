@@ -5,7 +5,7 @@
   - Mutator
   - EagerPeek from GC
 
-- FLUSH_FULL(need renamed) : memcpy local entries → RingBuffer slot (copy-by-value)
+- enq_global: memcpy local entries → RingBuffer slot (copy-by-value)
 */
 #ifndef BABQ_MUTATOR_H
 #define BABQ_MUTATOR_H
@@ -32,8 +32,7 @@ namespace babq
         return instance;
     }
 
-    // rename,rename,rename!
-    void flush_full(MutatorLocal &self);
+    void enq_global(MutatorLocal &self);
 
     void enqueue(MutatorLocal &self, RSetEntry entry)
     {
@@ -45,13 +44,13 @@ namespace babq
         // 2. publish the new index
         self.write_index.store(idx + 1, std::memory_order_release);
 
-        if (idx + 1 == BATCH_SIZE) [[unlikely]]
+        if (UNLIKELY(idx + 1 == BATCH_SIZE))
         {
-            flush_full(self);
+            enq_global(self);
         }
     }
 
-    void flush_full(MutatorLocal &self)
+    void enq_global(MutatorLocal &self)
     {
         // Prepare the batch for submission
         Batch batch;
