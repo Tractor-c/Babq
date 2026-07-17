@@ -11,7 +11,7 @@
 #define BABQ_MUTATOR_H
 
 #include "common.h"
-#include "ring_mpmc.h"
+#include "ring_spmc.h"
 #include <thread>
 
 namespace babq

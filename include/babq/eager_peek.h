@@ -2,7 +2,7 @@
 #define BABQ_EAGER_PEEK_H
 
 #include "common.h"
-#include "ring_mpmc.h"
+#include "ring_spmc.h"
 #include "mutator.h"
 #include <algorithm>
 #include <vector>

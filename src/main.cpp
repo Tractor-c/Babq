@@ -91,7 +91,7 @@ void test_concurrent()
 {
     printf("Test 3: Concurrent Mutators and GC Workers... ");
 
-    constexpr uint32_t NUM_MUTATORS = 4;
+    constexpr uint32_t NUM_MUTATORS = 1;
     constexpr uint32_t NUM_GC_WORKERS = 2;
     constexpr uint32_t ITEMS_PER_MUTATOR = babq::BATCH_SIZE * 1500;
 
