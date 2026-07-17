@@ -11,7 +11,7 @@
 #define BABQ_MUTATOR_H
 
 #include "common.h"
-#include "ring.h"
+#include "ring_mpmc.h"
 #include <thread>
 
 namespace babq
@@ -26,7 +26,7 @@ namespace babq
 
     // The global ring shared by all Mutators+ GC;
     // Initialization needed!
-    SharedRingBuffer &get_global_ring()
+    inline SharedRingBuffer &get_global_ring()
     {
         static SharedRingBuffer instance;
         return instance;
@@ -34,7 +34,7 @@ namespace babq
 
     void enq_global(MutatorLocal &self);
 
-    void enqueue(MutatorLocal &self, RSetEntry entry)
+    inline void enqueue(MutatorLocal &self, RSetEntry entry)
     {
         uint32_t idx = self.write_index.load(); // relaxed?
 
@@ -50,7 +50,7 @@ namespace babq
         }
     }
 
-    void enq_global(MutatorLocal &self)
+    inline void enq_global(MutatorLocal &self)
     {
         // Prepare the batch for submission
         Batch batch;
@@ -93,7 +93,7 @@ namespace babq
     using RSetProcessor = void (*)(RSetEntry entry);
 
     // gc_worker_drain: called by gc worker threads, to consume batch from ring
-    void gc_worker_drain(RSetProcessor processor)
+    inline void gc_worker_drain(RSetProcessor processor)
     {
         SharedRingBuffer &ring = get_global_ring();
         Batch batch;

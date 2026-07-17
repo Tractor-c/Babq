@@ -1,5 +1,5 @@
-#ifndef BABQ_RING_H
-#define BABQ_RING_H
+#ifndef BABQ_RING_MUTEX_H
+#define BABQ_RING_MUTEX_H
 
 #include "common.h"
 #include <mutex>

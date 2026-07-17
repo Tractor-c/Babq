@@ -2,10 +2,11 @@
 #define BABQ_EAGER_PEEK_H
 
 #include "common.h"
-#include "ring.h"
+#include "ring_mpmc.h"
 #include "mutator.h"
 #include <algorithm>
 #include <vector>
+#include <mutex>
 
 namespace babq
 {
@@ -42,13 +43,13 @@ namespace babq
         std::vector<MutatorLocal *> mutators_;
     };
 
-    MuatatorRegistry &get_mutator_registry()
+    inline MuatatorRegistry &get_mutator_registry()
     {
         static MuatatorRegistry instance;
         return instance;
     }
 
-    static void peek_one_mutator(SharedRingBuffer &ring, MutatorLocal &m)
+    inline void peek_one_mutator(SharedRingBuffer &ring, MutatorLocal &m)
     {
         // 1. Snapshot of the current size of Mutator's entries
         uint32_t snapshot_index = m.write_index.load(); // acquire
@@ -91,7 +92,7 @@ namespace babq
         }
     }
 
-    void eager_peek()
+    inline void eager_peek()
     {
         SharedRingBuffer &ring = get_global_ring();
         get_mutator_registry().visit_all([&](MutatorLocal &m)
@@ -101,7 +102,7 @@ namespace babq
     /*[used in STW] */
 
     // Read and clear a mutator's buffer
-    static void drain_one_mutator(MutatorLocal &m, RSetProcessor processor)
+    inline void drain_one_mutator(MutatorLocal &m, RSetProcessor processor)
     {
         uint32_t idx = m.write_index.load();
         for (uint32_t i = 0; i < idx; i++)
