@@ -16,7 +16,7 @@ namespace babq
     static constexpr uint32_t BATCH_SIZE = 64;
 
     // Max spin iterations before yielding on BUSY status.
-    static int SPIN_LIMIT = 32;
+    inline constexpr int SPIN_LIMIT = 32;
 
     using RSetEntry = uintptr_t;
 
@@ -53,12 +53,20 @@ namespace babq
 #endif
     }
 
+    // #if defined(__GNUC__) || defined(__clang__)
+    // #define LIKELY(x) __builtin_expect(!!(x), 1)
+    // #define UNLIKELY(x) __builtin_expect(!!(x), 0)
+    // #else
+    // #define LIKELY(x) (x)
+    // #define UNLIKELY(x) (x)
+    // #endif
+
 #if defined(__GNUC__) || defined(__clang__)
-#define LIKELY(x) __builtin_expect(!!(x), 1)
-#define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#define BABQ_LIKELY(x) __builtin_expect(!!(x), 1)
+#define BABQ_UNLIKELY(x) __builtin_expect(!!(x), 0)
 #else
-#define LIKELY(x) (x)
-#define UNLIKELY(x) (x)
+#define BABQ_LIKELY(x) (x)
+#define BABQ_UNLIKELY(x) (x)
 #endif
 
 }

@@ -116,6 +116,7 @@ void test_concurrent()
       }
       // Final drain to ensure empty
       babq::gc_worker_drain(test_processor); });
+      // within gc_worker_drain-> ensure ring is empty(DeqStatus:EMPTY).
     }
 
     // Launch Mutators

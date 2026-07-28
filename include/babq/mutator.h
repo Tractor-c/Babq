@@ -11,7 +11,7 @@
 #define BABQ_MUTATOR_H
 
 #include "common.h"
-#include "ring_spmc.h"
+#include "ring.h"
 #include <thread>
 
 namespace babq
@@ -44,7 +44,7 @@ namespace babq
         // 2. publish the new index
         self.write_index.store(idx + 1, std::memory_order_release);
 
-        if (UNLIKELY(idx + 1 == BATCH_SIZE))
+        if (BABQ_UNLIKELY(idx + 1 == BATCH_SIZE))
         {
             enq_global(self);
         }

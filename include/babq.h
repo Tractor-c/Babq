@@ -2,7 +2,7 @@
 #define BABQ_H
 
 #include "babq/common.h"
-#include "babq/ring_spmc.h"
+#include "babq/ring.h"
 #include "babq/mutator.h"
 #include "babq/eager_peek.h"
 

@@ -151,13 +151,13 @@ namespace babq
 
         // 2.1 if current block is not full
         /*NOTE：if detected , this block is currently been written, consumer will exit. [achieved on consumer side]*/
-        if (LIKELY(allocated_local < ENTRIES_PER_BLOCK))
+        if (BABQ_LIKELY(allocated_local < ENTRIES_PER_BLOCK))
         {
             // 3. FAA to claim a slot
             uint64_t old_allocated = blk.allocated.fetch_add(1);
             uint64_t old_local = cursor_local(old_allocated);
 
-            if (LIKELY(old_local < ENTRIES_PER_BLOCK))
+            if (BABQ_LIKELY(old_local < ENTRIES_PER_BLOCK))
             {
                 // 4. If a valid slot claimed, memcpy the Batch in
                 std::memcpy(&blk.entries[old_local], &batch, sizeof(Batch));
@@ -176,7 +176,7 @@ namespace babq
         uint64_t snapshot_verison = widx >> NUM_BLOCKS_LOG;
 
         // 3. Check whether next block is ready to write in
-        if (UNLIKELY(!(block_fully_consumed(next_blk, snapshot_verison))))
+        if (BABQ_UNLIKELY(!(block_fully_consumed(next_blk, snapshot_verison))))
         {
             return EnqStatus::FULL;
         }
@@ -203,23 +203,23 @@ namespace babq
         uint64_t reserved_local = cursor_local(reserved_val);
 
         // 2.1 current block is not fully reserved
-        if (LIKELY(reserved_local < ENTRIES_PER_BLOCK))
+        if (BABQ_LIKELY(reserved_local < ENTRIES_PER_BLOCK))
         {
             // 3. Check committed cursor of producers
             uint64_t committed_val = blk.committed.load();
             uint64_t committed_local = cursor_local(committed_val);
 
-            if (UNLIKELY(reserved_local >= committed_local))
+            if (BABQ_UNLIKELY(reserved_local >= committed_local))
             {
                 return DeqStatus::EMPTY;
             }
 
             // 4. Check if all allocated slots are committed (NO producer still writing)
-            if (UNLIKELY(committed_local != ENTRIES_PER_BLOCK))
+            if (BABQ_UNLIKELY(committed_local != ENTRIES_PER_BLOCK))
             {
                 uint64_t allocated_val = blk.allocated.load();
                 uint64_t allocated_local = cursor_local(allocated_val);
-                if (LIKELY(allocated_local != committed_local))
+                if (BABQ_LIKELY(allocated_local != committed_local))
                 {
                     // A producer is still writing
                     return DeqStatus::BUSY;
