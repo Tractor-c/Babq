@@ -18,47 +18,39 @@ endif()
 
 find_package(Threads REQUIRED)
 
-add_executable(babq
-    src/main.cpp
-)
+option(ENABLE_TSAN "Enable ThreadSanitizer for data-race detection" OFF)
 
-target_include_directories(babq
-    PRIVATE
+add_library(babq_headers INTERFACE)
+
+target_include_directories(babq_headers
+    INTERFACE
         "${PROJECT_SOURCE_DIR}/include"
 )
 
-target_compile_features(babq
-    PRIVATE
-        c_std_11
+target_compile_features(babq_headers
+    INTERFACE
         cxx_std_17
 )
 
-set_target_properties(babq PROPERTIES
-    C_EXTENSIONS OFF
-    CXX_EXTENSIONS OFF
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+target_link_libraries(babq_headers
+    INTERFACE
+        Threads::Threads
 )
 
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang" OR
-   CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(babq PRIVATE
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(babq_headers INTERFACE
         -Wall
         -Wextra
         -Wpedantic
     )
 elseif(MSVC)
-    target_compile_options(babq PRIVATE /W4)
+    target_compile_options(babq_headers INTERFACE /W4)
 endif()
-
-# ThreadSanitizer support
-option(ENABLE_TSAN "Enable ThreadSanitizer for data-race detection" OFF)
 
 if(ENABLE_TSAN)
-    target_compile_options(babq PRIVATE -fsanitize=thread)
-    target_link_options(babq PRIVATE -fsanitize=thread)
+    target_compile_options(babq_headers INTERFACE -fsanitize=thread)
+    target_link_options(babq_headers INTERFACE -fsanitize=thread)
 endif()
 
-target_link_libraries(babq
-    PRIVATE
-        Threads::Threads
-)
+enable_testing()
+add_subdirectory(test)
