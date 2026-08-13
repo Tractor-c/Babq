@@ -8,7 +8,8 @@
 #include "babq.h"
 
 #include <atomic>
-#include <cassert>
+// #include <cassert>
+#include "test/babq/babq_check.h"
 #include <cstdio>
 #include <thread>
 #include <vector>
@@ -80,7 +81,8 @@ namespace
       total_expected_sum.fetch_add(local_sum, std::memory_order_relaxed);
 
       // Assert local buffer is fully flushed
-      assert(mutator.write_index.load() == 0);
+      //assert(mutator.write_index.load() == 0);
+      BABQ_CHECK_EQ(mutator.write_index.load(), 0u);
 
       babq::get_mutator_registry().unregister_mutator(&mutator); });
         }
@@ -104,9 +106,13 @@ namespace
         uint64_t final_count = g_processed_count.load();
         uint64_t final_sum = g_processed_sum.load();
 
-        assert(final_count == NUM_MUTATORS * ITEMS_PER_MUTATOR);
-        assert(final_sum == total_expected_sum.load());
-        assert(babq::get_global_ring().size() == 0);
+        // assert(final_count == NUM_MUTATORS * ITEMS_PER_MUTATOR);
+        // assert(final_sum == total_expected_sum.load());
+        // assert(babq::get_global_ring().size() == 0);
+
+        BABQ_CHECK_EQ(final_count, static_cast<uint64_t>(NUM_MUTATORS) * ITEMS_PER_MUTATOR);
+        BABQ_CHECK_EQ(final_sum, total_expected_sum.load());
+        BABQ_CHECK_EQ(babq::get_global_ring().size(), 0u);
 
         printf("PASSED (Processed %llu items across %d threads)\n", final_count,
                NUM_MUTATORS + NUM_GC_WORKERS);

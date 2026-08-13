@@ -5,7 +5,8 @@
 #include "babq.h"
 
 #include <atomic>
-#include <cassert>
+// #include <cassert>
+#include "test/babq/babq_check.h"
 #include <cstdio>
 
 namespace
@@ -41,12 +42,12 @@ namespace
         }
 
         // write_index should have been reset to 0 after fully flush
-        assert(mutator.write_index.load() == 0);
+        BABQ_CHECK_EQ(mutator.write_index.load(), 0u);
 
         // Drain and verify
         babq::gc_worker_drain(test_processor);
-        assert(g_processed_count == inserted_items);
-        assert(g_processed_sum == expected_sum);
+        BABQ_CHECK_EQ(g_processed_count.load(), inserted_items);
+        BABQ_CHECK_EQ(g_processed_sum.load(), expected_sum);
 
         babq::get_mutator_registry().unregister_mutator(&mutator);
         printf("PASSED\n");

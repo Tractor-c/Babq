@@ -6,7 +6,8 @@
 #include "babq.h"
 
 #include <atomic>
-#include <cassert>
+// #include <cassert>
+#include "test/babq/babq_check.h"
 #include <cstdio>
 
 namespace
@@ -40,18 +41,22 @@ namespace
       expected_sum += entry;
       babq::enqueue(mutator, entry);
     }
-    assert(mutator.write_index.load() == partial);
+    //assert(mutator.write_index.load() == partial);
+    BABQ_CHECK_EQ(mutator.write_index.load(), partial);
 
     // EagerPeek should copy the partial batch into RingBuffer
     babq::eager_peek();
 
     // Drain and verify
     babq::gc_worker_drain(test_processor);
-    assert(g_processed_count == partial);
-    assert(g_processed_sum == expected_sum);
+    // assert(g_processed_count == partial);
+    // assert(g_processed_sum == expected_sum);
+    BABQ_CHECK_EQ(g_processed_count.load(), partial);
+    BABQ_CHECK_EQ(g_processed_sum.load(), expected_sum);
 
     // Mutator's state should be UNCHANGED (zero interference)
-    assert(mutator.write_index.load() == partial);
+    //assert(mutator.write_index.load() == partial);
+    BABQ_CHECK_EQ(mutator.write_index.load(), partial);
 
     babq::get_mutator_registry().unregister_mutator(&mutator);
     printf("PASSED\n");
