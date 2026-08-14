@@ -112,7 +112,7 @@ namespace
 
         BABQ_CHECK_EQ(final_count, static_cast<uint64_t>(NUM_MUTATORS) * ITEMS_PER_MUTATOR);
         BABQ_CHECK_EQ(final_sum, total_expected_sum.load());
-        BABQ_CHECK_EQ(babq::get_global_ring().size(), 0u);
+        BABQ_CHECK(babq::get_global_ring().is_drained());
 
         printf("PASSED (Processed %llu items across %d threads)\n", final_count,
                NUM_MUTATORS + NUM_GC_WORKERS);

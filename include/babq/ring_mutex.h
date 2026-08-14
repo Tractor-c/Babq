@@ -18,7 +18,7 @@ namespace babq
         // Function: consume a batch from the Ring Buffer
         DeqStatus dequeue(Batch &out);
 
-        size_t size() const;
+        bool is_drained() const;
 
     private:
         // NEED TO BE REPLACED BY BBQ;
@@ -28,7 +28,7 @@ namespace babq
         std::queue<Batch> queue_;
     };
 
-    EnqStatus SharedRingBuffer::enqueue(const Batch &batch)
+    inline EnqStatus SharedRingBuffer::enqueue(const Batch &batch)
     {
         std::lock_guard<std::mutex> lock(mu_);
         if (queue_.size() >= MAX_CAPACITY)
@@ -39,7 +39,7 @@ namespace babq
         return EnqStatus::OK;
     }
 
-    DeqStatus SharedRingBuffer::dequeue(Batch &out)
+    inline DeqStatus SharedRingBuffer::dequeue(Batch &out)
     {
         std::lock_guard<std::mutex> lock(mu_);
         if (queue_.empty())
@@ -51,10 +51,10 @@ namespace babq
         return DeqStatus::OK;
     }
 
-    size_t SharedRingBuffer::size() const
+    inline bool SharedRingBuffer::is_drained() const
     {
         std::lock_guard<std::mutex> lock(mu_);
-        return queue_.size();
+        return queue_.empty();
     }
 
 }

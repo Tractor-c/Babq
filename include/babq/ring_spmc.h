@@ -67,7 +67,8 @@ namespace babq
         // Function: consume a batch from the Ring Buffer
         DeqStatus dequeue(Batch &out);
 
-        size_t size() const;
+        // Fort tests. &Used only in STW.
+        bool is_drained() const;
 
     private:
         void init();
@@ -251,11 +252,29 @@ namespace babq
         return DeqStatus::BUSY; // Caller should retry
     }
 
-    inline size_t SharedRingBuffer::size() const
+    inline bool SharedRingBuffer::is_drained() const
     {
-        uint64_t w = widx_.load();
-        uint64_t r = ridx_.load();
-        return static_cast<size_t>((w - r) * ENTRIES_PER_BLOCK);
+        for (uint32_t i = 0; i < NUM_BLOCKS; i++)
+        {
+            uint64_t committed_val = blocks_[i].committed.load(std::memory_order_acquire);
+            uint64_t consumed_val = blocks_[i].consumed.load(std::memory_order_acquire);
+
+            uint64_t committed_version = cursor_version(committed_val);
+            uint64_t consumed_version = cursor_version(consumed_val);
+
+            if (consumed_version > committed_version)
+            {
+                return false;
+            }
+
+            uint64_t consumed_local = (consumed_version == committed_version) ? cursor_local(consumed_val) : 0;
+
+            if (cursor_local(committed_val) > consumed_local)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
 } // namespace babq
