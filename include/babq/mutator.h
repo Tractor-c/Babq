@@ -58,7 +58,6 @@ namespace babq
         batch.count = BATCH_SIZE;
 
         SharedRingBuffer &ring = get_global_ring();
-        int spin_count = 0;
 
         while (true)
         {
@@ -71,20 +70,6 @@ namespace babq
 
             case EnqStatus::FULL:
                 std::this_thread::yield();
-                break;
-
-            case EnqStatus::BUSY:
-                // Short Spin then yield;
-                if (spin_count < SPIN_LIMIT)
-                {
-                    spin_count++;
-                    cpu_relax();
-                }
-                else
-                {
-                    std::this_thread::yield();
-                    spin_count = 0;
-                }
                 break;
             }
         }

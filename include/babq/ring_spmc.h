@@ -85,6 +85,9 @@ namespace babq
         // Attempt to advance a global index via CAS
         void try_advance(std::atomic<uint64_t> &head, uint64_t expected);
 
+        // Write batch into the block designated by widx.
+        bool try_write_into_block(uint64_t widx, const Batch &batch);
+
         // For Mutator / Producer to track write position within the current block
         uint32_t local_write_pos_{0};
     };
@@ -137,31 +140,41 @@ namespace babq
         return (consumed_local == ENTRIES_PER_BLOCK && consumed_version == version) || consumed_version > version;
     }
 
+    inline bool SharedRingBuffer::try_write_into_block(uint64_t widx, const Batch &batch)
+    {
+        if (BABQ_UNLIKELY(local_write_pos_ >= ENTRIES_PER_BLOCK))
+        {
+            return false;
+        }
+
+        uint32_t block_idx = static_cast<uint32_t>(widx) & BLOCK_IDX_MASK;
+        Block &blk = blocks_[block_idx];
+
+        std::memcpy(&blk.entries[local_write_pos_], &batch, sizeof(Batch));
+        local_write_pos_++;
+
+        uint64_t version = (widx >> NUM_BLOCKS_LOG) + (block_idx != 0 ? 1 : 0);
+        blk.committed.store(cursor_compose(version, local_write_pos_));
+        return true;
+    }
+
     inline EnqStatus SharedRingBuffer::enqueue(const Batch &batch)
     {
         // 1. Read the current write block index
-        uint64_t widx = widx_.load(); // relaxed
-        uint32_t block_idx = static_cast<uint32_t>(widx) & BLOCK_IDX_MASK;
+        const uint64_t widx = widx_.load(); // relaxed
 
-        Block &blk = blocks_[block_idx];
-
-        if (BABQ_LIKELY(local_write_pos_ < ENTRIES_PER_BLOCK))
+        // 2.1 Fast path: current block still has room
+        if (BABQ_LIKELY(try_write_into_block(widx, batch)))
         {
-            std::memcpy(&blk.entries[local_write_pos_], &batch, sizeof(Batch));
-            local_write_pos_++;
-
-            // uint64_t version = widx >> NUM_BLOCKS_LOG; DEADLOCK!!
-            uint64_t version = (widx >> NUM_BLOCKS_LOG) + (block_idx != 0 ? 1 : 0);
-            blk.committed.store(cursor_compose(version, local_write_pos_));
             return EnqStatus::OK;
         }
 
-        // 2.2 if (failed FAA | current block is full) , ->slow path: advance to next block
-        uint32_t next_block_idx = (block_idx + 1) & BLOCK_IDX_MASK;
+        // 2.2 Slow path: current block is full -> advance to next block
+        const uint32_t next_block_idx = (static_cast<uint32_t>(widx) + 1) & BLOCK_IDX_MASK;
         Block &next_blk = blocks_[next_block_idx];
 
         // the version when Enqueue was triggered
-        uint64_t snapshot_verison = widx >> NUM_BLOCKS_LOG;
+        const uint64_t snapshot_verison = widx >> NUM_BLOCKS_LOG;
 
         // 3. Check whether next block is ready to write in
         if (BABQ_UNLIKELY(!(block_fully_consumed(next_blk, snapshot_verison))))
@@ -169,13 +182,14 @@ namespace babq
             return EnqStatus::FULL;
         }
 
-        uint64_t new_version = snapshot_verison + 1;
+        const uint64_t new_version = snapshot_verison + 1;
         next_blk.committed.store(cursor_compose(new_version, 0));
-        local_write_pos_ = 0; // sure?
+        local_write_pos_ = 0;
 
         widx_.store(widx + 1);
 
-        return EnqStatus::BUSY;
+        (void)try_write_into_block(widx + 1, batch);
+        return EnqStatus::OK;
     }
 
     inline DeqStatus SharedRingBuffer::dequeue(Batch &out)

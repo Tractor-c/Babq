@@ -31,7 +31,6 @@ namespace babq
     {
         OK,   // Successfully enqueued
         FULL, // RingBuffer is full (GC consumers too slow)
-        BUSY  // Temporary contention; short retry recommended
     };
 
     enum class DeqStatus

@@ -64,7 +64,6 @@ namespace babq
         copied_batch.count = snapshot_index;
 
         // 3. Sumbit the copy to Ring; same in the enq_global()
-        int spin_count = 0;
         while (true)
         {
             EnqStatus status = ring.enqueue(copied_batch);
@@ -75,19 +74,6 @@ namespace babq
             else if (status == EnqStatus::FULL)
             {
                 std::this_thread::yield();
-            }
-            else
-            {
-                if (spin_count < SPIN_LIMIT)
-                {
-                    spin_count++;
-                    cpu_relax();
-                }
-                else
-                {
-                    std::this_thread::yield();
-                    spin_count = 0;
-                }
             }
         }
     }
