@@ -75,7 +75,7 @@ namespace
       for (uint32_t j = 0; j < ITEMS_PER_MUTATOR; j++) {
         babq::RSetEntry entry = base_val + j;
         local_sum += entry;
-        babq::enqueue(mutator, entry);
+        babq::enqueue(mutator, entry, test_processor);
       }
 
       total_expected_sum.fetch_add(local_sum, std::memory_order_relaxed);

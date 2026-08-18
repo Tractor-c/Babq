@@ -38,7 +38,7 @@ namespace
         {
             babq::RSetEntry entry = 0x1000 + i;
             expected_sum += entry;
-            babq::enqueue(mutator, entry);
+            babq::enqueue(mutator, entry, test_processor);
         }
 
         // write_index should have been reset to 0 after fully flush

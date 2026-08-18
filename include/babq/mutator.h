@@ -22,6 +22,8 @@ namespace babq
         RSetEntry entries[BATCH_SIZE];
         // Current 'write in' position
         std::atomic<uint32_t> write_index{0};
+        // How many batches took the fallback path (ring was FULL).
+        uint64_t full_count{0};
     };
 
     // The global ring shared by all Mutators+ GC;
@@ -32,9 +34,11 @@ namespace babq
         return instance;
     }
 
-    void enq_global(MutatorLocal &self);
+    using RSetProcessor = void (*)(RSetEntry entry);
 
-    inline void enqueue(MutatorLocal &self, RSetEntry entry)
+    EnqStatus enq_global(MutatorLocal &self);
+
+    inline void enqueue(MutatorLocal &self, RSetEntry entry, RSetProcessor fallback)
     {
         uint32_t idx = self.write_index.load(); // relaxed?
 
@@ -46,11 +50,24 @@ namespace babq
 
         if (BABQ_UNLIKELY(idx + 1 == BATCH_SIZE))
         {
-            enq_global(self);
+            switch (enq_global(self))
+            {
+            case EnqStatus::OK:
+                break;
+
+            case EnqStatus::FULL:
+            self.full_count++;
+                for (uint32_t i = 0; i < BATCH_SIZE; i++)
+                {
+                    fallback(self.entries[i]);
+                }
+                self.write_index.store(0);
+                break;
+            }
         }
     }
 
-    inline void enq_global(MutatorLocal &self)
+    inline EnqStatus enq_global(MutatorLocal &self)
     {
         // Prepare the batch for submission
         Batch batch;
@@ -59,23 +76,13 @@ namespace babq
 
         SharedRingBuffer &ring = get_global_ring();
 
-        while (true)
+        EnqStatus status = ring.enqueue(batch);
+        if (status == EnqStatus::OK)
         {
-            EnqStatus status = ring.enqueue(batch);
-            switch (status)
-            {
-            case EnqStatus::OK:
-                self.write_index.store(0); // release?
-                return;
-
-            case EnqStatus::FULL:
-                std::this_thread::yield();
-                break;
-            }
+            self.write_index.store(0); // release?
         }
+        return status;
     }
-
-    using RSetProcessor = void (*)(RSetEntry entry);
 
     // gc_worker_drain: called by gc worker threads, to consume batch from ring
     inline void gc_worker_drain(RSetProcessor processor)
@@ -97,10 +104,13 @@ namespace babq
 
             case DeqStatus::EMPTY:
                 // no more batch need to consumed
+                /*NEED TO FIX in integration stage:
+                gc thread park ;
+                */
                 return;
 
             case DeqStatus::BUSY:
-                std::this_thread::yield();
+                // retry dequeue directly
                 break;
             }
         }

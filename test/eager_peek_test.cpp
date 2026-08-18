@@ -39,7 +39,7 @@ namespace
     {
       babq::RSetEntry entry = 0x2000 + i;
       expected_sum += entry;
-      babq::enqueue(mutator, entry);
+      babq::enqueue(mutator, entry, test_processor);
     }
     //assert(mutator.write_index.load() == partial);
     BABQ_CHECK_EQ(mutator.write_index.load(), partial);

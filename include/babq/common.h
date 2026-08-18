@@ -37,7 +37,7 @@ namespace babq
     {
         OK,    // Successfully dequeued
         EMPTY, // RingBuffer is empty (no data to consume)
-        BUSY   // Temporary contention; short retry recommended
+        BUSY   // Temporary contention; retry directly
     };
 
     inline void cpu_relax()
