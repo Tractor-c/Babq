@@ -19,7 +19,7 @@ namespace babq
     struct MutatorLocal
     {
         // Fixed local array for batching RSet
-        RSetEntry entries[BATCH_SIZE];
+        std::atomic<RSetEntry> entries[BATCH_SIZE];
         // Current 'write in' position
         std::atomic<uint32_t> write_index{0};
         // How many batches took the fallback path (ring was FULL).
@@ -43,7 +43,7 @@ namespace babq
         uint32_t idx = self.write_index.load(); // relaxed?
 
         // 1. local write
-        self.entries[idx] = entry;
+        self.entries[idx].store(entry, std::memory_order_relaxed);
 
         // 2. publish the new index
         self.write_index.store(idx + 1, std::memory_order_release);
@@ -56,10 +56,10 @@ namespace babq
                 break;
 
             case EnqStatus::FULL:
-            self.full_count++;
+                self.full_count++;
                 for (uint32_t i = 0; i < BATCH_SIZE; i++)
                 {
-                    fallback(self.entries[i]);
+                    fallback(self.entries[i].load(std::memory_order_relaxed));
                 }
                 self.write_index.store(0);
                 break;
@@ -69,14 +69,9 @@ namespace babq
 
     inline EnqStatus enq_global(MutatorLocal &self)
     {
-        // Prepare the batch for submission
-        Batch batch;
-        std::memcpy(batch.entries, self.entries, BATCH_SIZE * sizeof(RSetEntry));
-        batch.count = BATCH_SIZE;
-
         SharedRingBuffer &ring = get_global_ring();
 
-        EnqStatus status = ring.enqueue(batch);
+        EnqStatus status = ring.enqueue(self.entries, BATCH_SIZE);
         if (status == EnqStatus::OK)
         {
             self.write_index.store(0); // release?

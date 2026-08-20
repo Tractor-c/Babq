@@ -1,6 +1,5 @@
 /*
- * eager_peek_test — 上层：EagerPeek 把未满批的本地缓冲复制进全局 ring，
- * 且不推进 mutator 的 write_index（对 mutator 零干扰）。
+ * eager_peek_test — 上层：EagerPeek直接处理读取到的Mutator's unfull batch
  */
 
 #include "babq.h"
@@ -41,21 +40,20 @@ namespace
       expected_sum += entry;
       babq::enqueue(mutator, entry, test_processor);
     }
-    //assert(mutator.write_index.load() == partial);
     BABQ_CHECK_EQ(mutator.write_index.load(), partial);
 
-    // EagerPeek should copy the partial batch into RingBuffer
-    babq::eager_peek();
+    // EagerPeek process the batch directly, without enq to global ring
+    babq::eager_peek(test_processor);
 
-    // Drain and verify
-    babq::gc_worker_drain(test_processor);
-    // assert(g_processed_count == partial);
-    // assert(g_processed_sum == expected_sum);
     BABQ_CHECK_EQ(g_processed_count.load(), partial);
     BABQ_CHECK_EQ(g_processed_sum.load(), expected_sum);
 
+    // Ensure EagerPeek will not enq the global ring: UB
+    BABQ_CHECK(babq::get_global_ring().is_drained());
+    babq::gc_worker_drain(test_processor);
+    BABQ_CHECK_EQ(g_processed_count.load(), partial);
+
     // Mutator's state should be UNCHANGED (zero interference)
-    //assert(mutator.write_index.load() == partial);
     BABQ_CHECK_EQ(mutator.write_index.load(), partial);
 
     babq::get_mutator_registry().unregister_mutator(&mutator);

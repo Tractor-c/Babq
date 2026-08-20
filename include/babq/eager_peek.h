@@ -49,51 +49,30 @@ namespace babq
         return instance;
     }
 
-    inline void peek_one_mutator(SharedRingBuffer &ring, MutatorLocal &m)
+    inline void peek_one_mutator(MutatorLocal &m, RSetProcessor processor)
     {
-        // 1. Snapshot of the current size of Mutator's entries
         uint32_t snapshot_index = m.write_index.load(); // acquire
-        if (snapshot_index == 0)
-        {
-            return;
-        }
 
-        // 2.Memcpy the Mutator's entries into a new Batch
-        Batch copied_batch;
-        std::memcpy(copied_batch.entries, m.entries, snapshot_index * sizeof(RSetEntry));
-        copied_batch.count = snapshot_index;
-
-        // 3. Sumbit the copy to Ring; same in the enq_global()
-        while (true)
+        for (uint32_t i = 0; i < snapshot_index; i++)
         {
-            EnqStatus status = ring.enqueue(copied_batch);
-            if (status == EnqStatus::OK)
-            {
-                break;
-            }
-            else if (status == EnqStatus::FULL)
-            {
-                std::this_thread::yield();
-            }
+            processor(m.entries[i].load(std::memory_order_relaxed));
         }
     }
 
-    inline void eager_peek()
+    inline void eager_peek(RSetProcessor processor)
     {
-        SharedRingBuffer &ring = get_global_ring();
-        get_mutator_registry().visit_all([&](MutatorLocal &m)
-                                         { peek_one_mutator(ring, m); });
+        get_mutator_registry().visit_all([processor](MutatorLocal &m)
+                                         { peek_one_mutator(m, processor); });
     }
 
     /*[used in STW] */
-
     // Read and clear a mutator's buffer
     inline void drain_one_mutator(MutatorLocal &m, RSetProcessor processor)
     {
         uint32_t idx = m.write_index.load();
         for (uint32_t i = 0; i < idx; i++)
         {
-            processor(m.entries[i]);
+            processor(m.entries[i].load(std::memory_order_relaxed));
         }
         m.write_index.store(0);
     }

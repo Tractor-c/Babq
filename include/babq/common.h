@@ -15,9 +15,6 @@ namespace babq
     // Number of RSet entries per Batch.
     static constexpr uint32_t BATCH_SIZE = 64;
 
-    // Max spin iterations before yielding on BUSY status.
-    inline constexpr int SPIN_LIMIT = 32;
-
     using RSetEntry = uintptr_t;
 
     //  Batch: unit of data exchanged via the RingBuffer
@@ -39,18 +36,6 @@ namespace babq
         EMPTY, // RingBuffer is empty (no data to consume)
         BUSY   // Temporary contention; retry directly
     };
-
-    inline void cpu_relax()
-    {
-#if defined(__x86_64__) || defined(_M_X64)
-        __asm__ volatile("pause" ::: "memory");
-#elif defined(__aarch64__)
-        __asm__ volatile("yield" ::: "memory");
-#else
-        // Fallback: compiler fence
-        std::atomic_signal_fence(std::memory_order_seq_cst);
-#endif
-    }
 
     // #if defined(__GNUC__) || defined(__clang__)
     // #define LIKELY(x) __builtin_expect(!!(x), 1)

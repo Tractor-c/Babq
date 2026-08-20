@@ -61,7 +61,7 @@ namespace babq
 
         // Producer interface(called by Mutator/EagerPeek)
         // Function: memcpy batch into Ring buffer
-        EnqStatus enqueue(const Batch &batch);
+        EnqStatus enqueue(const std::atomic<RSetEntry> *src, uint32_t count);
 
         // Consumer interface (called by GC Worker)
         // Function: consume a batch from the Ring Buffer
@@ -85,8 +85,8 @@ namespace babq
         // Attempt to advance a global index via CAS
         void try_advance(std::atomic<uint64_t> &head, uint64_t expected);
 
-        // Write batch into the block designated by widx.
-        bool try_write_into_block(uint64_t widx, const Batch &batch);
+        // Write count entries from src into the block designated by widx.
+        bool try_write_into_block(uint64_t widx, const std::atomic<RSetEntry> *src, uint32_t count);
 
         // For Mutator / Producer to track write position within the current block
         uint32_t local_write_pos_{0};
@@ -140,7 +140,7 @@ namespace babq
         return (consumed_local == ENTRIES_PER_BLOCK && consumed_version == version) || consumed_version > version;
     }
 
-    inline bool SharedRingBuffer::try_write_into_block(uint64_t widx, const Batch &batch)
+    inline bool SharedRingBuffer::try_write_into_block(uint64_t widx, const std::atomic<RSetEntry> *src, uint32_t count)
     {
         if (BABQ_UNLIKELY(local_write_pos_ >= ENTRIES_PER_BLOCK))
         {
@@ -150,7 +150,12 @@ namespace babq
         uint32_t block_idx = static_cast<uint32_t>(widx) & BLOCK_IDX_MASK;
         Block &blk = blocks_[block_idx];
 
-        std::memcpy(&blk.entries[local_write_pos_], &batch, sizeof(Batch));
+        Batch &slot = blk.entries[local_write_pos_];
+        for (uint32_t i = 0; i < count; i++)
+        {
+            slot.entries[i] = src[i].load(std::memory_order_relaxed);
+        }
+        slot.count = count;
         local_write_pos_++;
 
         uint64_t version = (widx >> NUM_BLOCKS_LOG) + (block_idx != 0 ? 1 : 0);
@@ -158,13 +163,13 @@ namespace babq
         return true;
     }
 
-    inline EnqStatus SharedRingBuffer::enqueue(const Batch &batch)
+    inline EnqStatus SharedRingBuffer::enqueue(const std::atomic<RSetEntry> *src, uint32_t count)
     {
         // 1. Read the current write block index
         const uint64_t widx = widx_.load(); // relaxed
 
         // 2.1 Fast path: current block still has room
-        if (BABQ_LIKELY(try_write_into_block(widx, batch)))
+        if (BABQ_LIKELY(try_write_into_block(widx, src, count)))
         {
             return EnqStatus::OK;
         }
@@ -188,7 +193,7 @@ namespace babq
 
         widx_.store(widx + 1);
 
-        (void)try_write_into_block(widx + 1, batch);
+        (void)try_write_into_block(widx + 1, src, count);
         return EnqStatus::OK;
     }
 
