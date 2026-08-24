@@ -268,7 +268,7 @@ namespace babq
         // 5. try to advance the global read idx
         try_advance(ridx_, ridx);
 
-        return DeqStatus::BUSY; // Caller should retry
+        return DeqStatus::BUSY; 
     }
 
     inline bool SharedRingBuffer::is_drained() const
